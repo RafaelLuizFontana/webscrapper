@@ -1,5 +1,7 @@
 package br.com.rafaelfontana.webscrapper.util;
 
+import java.util.regex.Pattern;
+
 import br.com.rafaelfontana.webscrapper.dto.LinesAndBytesDTO;
 
 public class LinesAndBytesUtils {
@@ -10,9 +12,12 @@ public class LinesAndBytesUtils {
 	
 	public static LinesAndBytesDTO linesAndBytesCalculator(String linesAndBytesString) {
 		LinesAndBytesDTO linesAndBytes = new LinesAndBytesDTO();
-		String[] values = linesAndBytesString.split("[|]");
+		String[] values = linesAndBytesString.split(Pattern.quote("|"));
 		for(int i = 0; i < values.length; i++) {
 			values[i] = values[i].trim();
+			if(values[i].contains("title=\"File mode\"")) {
+				continue;
+			}
 			if(values[i].contains("lines")) {
 				String value = values[i].substring(0, values[i].indexOf(' '));
 				linesAndBytes.setTotalLines(Long.valueOf(value));
