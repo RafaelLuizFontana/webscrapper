@@ -2,7 +2,11 @@ package br.com.rafaelfontana.webscrapper.controller;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,17 +14,22 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import br.com.rafaelfontana.webscrapper.dto.LinesAndBytesDTO;
+import br.com.rafaelfontana.webscrapper.service.GitHubService;
 import br.com.rafaelfontana.webscrapper.util.LinesAndBytesUtils;
 
 @RestController
 public class FileInfoController {
 	
-	private final String folder = "/tree/";
+	private static final Logger logger = LoggerFactory.getLogger(FileInfoController.class);
+	private final GitHubService gitHubService;
 	private final String file = "/blob/";
 	private final String baseUri = "https://github.com/";
+	
+	public FileInfoController(GitHubService gitHubService) {
+		this.gitHubService = gitHubService;
+	}
 	
 	@RequestMapping(value = "/webscrapper", method = RequestMethod.GET)
 	public ResponseEntity<LinesAndBytesDTO> getFileListFromGitHub(@RequestParam String uri) {
@@ -29,14 +38,17 @@ public class FileInfoController {
 		}
 		try {
 			return new ResponseEntity<LinesAndBytesDTO>(getSumLinesAndBytesDTO(uri, new LinesAndBytesDTO()), HttpStatus.OK);
-		} catch (RestClientException e) {
+		} catch (InterruptedException | ExecutionException | RestClientException e) {
 			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 	}
 	
-	private LinesAndBytesDTO getSumLinesAndBytesDTO(String uri, LinesAndBytesDTO linesAndBytes) throws RestClientException {
-		RestTemplate restTemplate = new RestTemplate();
-		String result = restTemplate.getForObject(uri, String.class);
+	private LinesAndBytesDTO getSumLinesAndBytesDTO(String uri, LinesAndBytesDTO linesAndBytes) throws InterruptedException, ExecutionException, RestClientException {
+		long start = System.currentTimeMillis();
+		CompletableFuture<String> futureResult = gitHubService.getHtml(uri);
+		CompletableFuture.allOf(futureResult).join();
+		logger.info("Elapsed time: " + (System.currentTimeMillis() - start));
+		String result = futureResult.get();
 		LinesAndBytesDTO sum = new LinesAndBytesDTO();
 		sum.setTotalLines(linesAndBytes.getTotalLines());
 		sum.setTotalBytes(linesAndBytes.getTotalBytes());
@@ -55,7 +67,7 @@ public class FileInfoController {
 	}
 	
 	private boolean validateUri(String uri) {
-		return uri.startsWith(baseUri) && (uri.contains(folder) || uri.contains(file));
+		return uri.startsWith(baseUri);
 	}
 	
 	private List<String> findUris(String html) {
@@ -84,10 +96,11 @@ public class FileInfoController {
 	
 	private LinesAndBytesDTO getLineAndBytes(String html) {
 		String linesAndbytesString = html.substring(html.indexOf("text-mono f6"));
+		linesAndbytesString = linesAndbytesString.substring(linesAndbytesString.indexOf(">") + 1);
+		linesAndbytesString = linesAndbytesString.substring(0, linesAndbytesString.indexOf("</div>"));
 		if (linesAndbytesString.contains("file-info-divider")) {
 			linesAndbytesString = linesAndbytesString.replace("<span class=\"file-info-divider\"></span>", "|");
 		}
-		linesAndbytesString = linesAndbytesString.substring(linesAndbytesString.indexOf(">")+1, linesAndbytesString.indexOf("<")).trim();
 		return LinesAndBytesUtils.linesAndBytesCalculator(linesAndbytesString);
 	}
 }
