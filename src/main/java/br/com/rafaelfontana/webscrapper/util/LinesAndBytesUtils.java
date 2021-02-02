@@ -22,14 +22,14 @@ public class LinesAndBytesUtils {
 				String value = values[i].substring(0, values[i].indexOf(' '));
 				linesAndBytes.setTotalLines(Long.valueOf(value));
 			} else {
-				long multiplier = 0;
+				long multiplier = 1L;
 				String value = values[i].substring(0, values[i].indexOf(' '));
 				String modifier = values[i].substring(values[i].lastIndexOf(' ') + 1);
 				switch(modifier) {
 					case "MB":
-						multiplier = multiplier + 1024L;
+						multiplier = multiplier * 1024L;
 					case "KB":
-						multiplier = multiplier + 1024L;
+						multiplier = multiplier * 1024L;
 						break;
 					default:
 						multiplier = 1;
